@@ -7,6 +7,10 @@
       "config": {
         "distDir": "build"
       }
+    },
+    {
+      "src": "api/*.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -19,14 +23,6 @@
       "dest": "/client/build/$1"
     }
   ],
-  "functions": {
-    "api/positions.js": {
-      "maxDuration": 10
-    },
-    "api/applications.js": {
-      "maxDuration": 30
-    }
-  },
   "env": {
     "NODE_ENV": "production"
   }
