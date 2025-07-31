@@ -2,10 +2,10 @@
   "version": 2,
   "builds": [
     {
-      "src": "client/package.json",
+      "src": "vercel-build.sh",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "build"
+        "distDir": "client/build"
       }
     },
     {
