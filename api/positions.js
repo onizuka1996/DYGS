@@ -1,18 +1,3 @@
-const { MongoClient } = require('mongodb');
-
-let cachedDb = null;
-
-async function connectToDatabase() {
-  if (cachedDb) {
-    return cachedDb;
-  }
-
-  const client = new MongoClient(process.env.MONGODB_URI);
-  await client.connect();
-  cachedDb = client.db('dygs_jobs');
-  return cachedDb;
-}
-
 module.exports = async (req, res) => {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -29,10 +14,49 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const db = await connectToDatabase();
-    const positions = await db.collection('positions')
-      .find({ is_active: true })
-      .toArray();
+    // Static positions data
+    const positions = [
+      {
+        id: 1,
+        title: 'Logistics Coordinator',
+        department: 'Operations',
+        description: 'จัดการและประสานงานการขนส่งสินค้า',
+        requirements: 'ประสบการณ์ 2-3 ปี, ภาษาอังกฤษดี',
+        is_active: true
+      },
+      {
+        id: 2,
+        title: 'Warehouse Manager',
+        department: 'Warehouse',
+        description: 'จัดการคลังสินค้าและทีมงาน',
+        requirements: 'ประสบการณ์ 5+ ปี, ภาวะผู้นำ',
+        is_active: true
+      },
+      {
+        id: 3,
+        title: 'Delivery Driver',
+        department: 'Transportation',
+        description: 'ขับรถส่งสินค้าในพื้นที่',
+        requirements: 'ใบขับขี่, ร่างกายแข็งแรง',
+        is_active: true
+      },
+      {
+        id: 4,
+        title: 'Customer Service',
+        department: 'Sales',
+        description: 'ให้บริการลูกค้าและประสานงาน',
+        requirements: 'ประสบการณ์ 1-2 ปี, การสื่อสารดี',
+        is_active: true
+      },
+      {
+        id: 5,
+        title: 'IT Support',
+        department: 'IT',
+        description: 'ดูแลระบบคอมพิวเตอร์และเครือข่าย',
+        requirements: 'ความรู้ IT, การแก้ไขปัญหา',
+        is_active: true
+      }
+    ];
     
     res.status(200).json(positions);
   } catch (error) {

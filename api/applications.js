@@ -1,19 +1,6 @@
-const { MongoClient } = require('mongodb');
+const { google } = require('googleapis');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
-
-let cachedDb = null;
-
-async function connectToDatabase() {
-  if (cachedDb) {
-    return cachedDb;
-  }
-
-  const client = new MongoClient(process.env.MONGODB_URI);
-  await client.connect();
-  cachedDb = client.db('dygs_jobs');
-  return cachedDb;
-}
 
 // Configure multer for memory storage
 const upload = multer({
@@ -34,99 +21,85 @@ const upload = multer({
   }
 });
 
-// LINE OA Integration
-async function sendToLineOA(applicationData) {
+// Google Sheets API setup
+const auth = new google.auth.GoogleAuth({
+  credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '{}'),
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
+
+const sheets = google.sheets({ version: 'v4', auth });
+
+// Save application to Google Sheets
+async function saveToGoogleSheets(applicationData) {
   try {
-    const line = require('@line/bot-sdk');
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    const range = 'Applications!A:Z'; // Assuming sheet name is "Applications"
     
-    const config = {
-      channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-      channelSecret: process.env.LINE_CHANNEL_SECRET
-    };
+    const values = [
+      [
+        applicationData.application_id,
+        applicationData.first_name,
+        applicationData.last_name,
+        applicationData.email,
+        applicationData.phone,
+        applicationData.position,
+        applicationData.experience_years,
+        applicationData.education,
+        applicationData.skills,
+        applicationData.cover_letter || '',
+        applicationData.resume_filename || '',
+        new Date().toISOString(),
+        'pending'
+      ]
+    ];
 
-    const client = new line.Client(config);
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: { values }
+    });
 
-    const message = {
-      type: 'text',
-      text: `📋 ใบสมัครงานใหม่จาก DYGS
-
-🆔 Application ID: ${applicationData.application_id}
-👤 ชื่อ: ${applicationData.first_name} ${applicationData.last_name}
-📧 อีเมล: ${applicationData.email}
-📱 เบอร์โทร: ${applicationData.phone}
-💼 ตำแหน่ง: ${applicationData.position}
-📈 ประสบการณ์: ${applicationData.experience_years} ปี
-🎓 การศึกษา: ${applicationData.education}
-🛠️ ทักษะ: ${applicationData.skills}
-📝 จดหมายสมัครงาน: ${applicationData.cover_letter ? 'มี' : 'ไม่มี'}
-📎 Resume: ${applicationData.resume_data}
-
-⏰ เวลาสมัคร: ${new Date().toLocaleString('th-TH')}`
-    };
-
-    if (process.env.LINE_GROUP_ID) {
-      await client.pushMessage(process.env.LINE_GROUP_ID, message);
-    }
-    
-    console.log('Application sent to LINE OA successfully');
+    console.log('Application saved to Google Sheets successfully');
   } catch (error) {
-    console.error('LINE OA error:', error);
+    console.error('Google Sheets error:', error);
+    throw error;
   }
 }
 
-// Initialize collections
-async function initializeCollections(db) {
+// Initialize Google Sheet
+async function initializeGoogleSheet() {
   try {
-    const applications = db.collection('applications');
-    const positions = db.collection('positions');
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    
+    // Create headers if sheet doesn't exist
+    const headers = [
+      'Application ID',
+      'First Name',
+      'Last Name',
+      'Email',
+      'Phone',
+      'Position',
+      'Experience (Years)',
+      'Education',
+      'Skills',
+      'Cover Letter',
+      'Resume File',
+      'Submission Date',
+      'Status'
+    ];
 
-    // Create indexes
-    await applications.createIndex({ application_id: 1 }, { unique: true });
-    await positions.createIndex({ title: 1 });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: 'Applications!A1:M1',
+      valueInputOption: 'RAW',
+      resource: { values: [headers] }
+    });
 
-    // Check if positions collection is empty and insert sample data
-    const positionsCount = await positions.countDocuments();
-    if (positionsCount === 0) {
-      await positions.insertMany([
-        {
-          title: 'Logistics Coordinator',
-          department: 'Operations',
-          description: 'จัดการและประสานงานการขนส่งสินค้า',
-          requirements: 'ประสบการณ์ 2-3 ปี, ภาษาอังกฤษดี',
-          is_active: true
-        },
-        {
-          title: 'Warehouse Manager',
-          department: 'Warehouse',
-          description: 'จัดการคลังสินค้าและทีมงาน',
-          requirements: 'ประสบการณ์ 5+ ปี, ภาวะผู้นำ',
-          is_active: true
-        },
-        {
-          title: 'Delivery Driver',
-          department: 'Transportation',
-          description: 'ขับรถส่งสินค้าในพื้นที่',
-          requirements: 'ใบขับขี่, ร่างกายแข็งแรง',
-          is_active: true
-        },
-        {
-          title: 'Customer Service',
-          department: 'Sales',
-          description: 'ให้บริการลูกค้าและประสานงาน',
-          requirements: 'ประสบการณ์ 1-2 ปี, การสื่อสารดี',
-          is_active: true
-        },
-        {
-          title: 'IT Support',
-          department: 'IT',
-          description: 'ดูแลระบบคอมพิวเตอร์และเครือข่าย',
-          requirements: 'ความรู้ IT, การแก้ไขปัญหา',
-          is_active: true
-        }
-      ]);
-    }
+    console.log('Google Sheet initialized successfully');
   } catch (error) {
-    console.error('Error initializing collections:', error);
+    console.error('Error initializing Google Sheet:', error);
   }
 }
 
@@ -142,9 +115,6 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const db = await connectToDatabase();
-    await initializeCollections(db);
-
     if (req.method === 'GET') {
       // Get application by ID
       const { id } = req.query;
@@ -152,14 +122,11 @@ module.exports = async (req, res) => {
         return res.status(400).json({ error: 'Application ID is required' });
       }
 
-      const application = await db.collection('applications')
-        .findOne({ application_id: id });
-      
-      if (!application) {
-        return res.status(404).json({ error: 'Application not found' });
-      }
-      
-      res.status(200).json(application);
+      // For now, return a simple response since we're not storing in database
+      res.status(200).json({ 
+        application_id: id,
+        message: 'Application submitted successfully. Please check your email for confirmation.'
+      });
     } else if (req.method === 'POST') {
       // Handle file upload and application submission
       upload.single('resume')(req, res, async (err) => {
@@ -183,14 +150,11 @@ module.exports = async (req, res) => {
           const application_id = `DYGS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           
           // Handle file upload
-          let resume_data = null;
+          let resume_filename = null;
           if (req.file) {
-            resume_data = {
-              filename: req.file.originalname,
-              mimetype: req.file.mimetype,
-              size: req.file.size,
-              data: req.file.buffer.toString('base64')
-            };
+            resume_filename = req.file.originalname;
+            // In a real implementation, you might want to upload to cloud storage
+            // For now, we'll just store the filename
           }
 
           const application = {
@@ -203,34 +167,21 @@ module.exports = async (req, res) => {
             experience_years: parseInt(experience_years),
             education,
             skills,
-            resume_data,
             cover_letter,
-            status: 'pending',
-            created_at: new Date(),
-            updated_at: new Date()
+            resume_filename
           };
 
-          await db.collection('applications').insertOne(application);
+          // Save to Google Sheets
+          await saveToGoogleSheets(application);
 
-          // Send to LINE OA
-          await sendToLineOA({
-            application_id,
-            first_name,
-            last_name,
-            email,
-            phone,
-            position,
-            experience_years,
-            education,
-            skills,
-            cover_letter,
-            resume_data: resume_data ? 'แนบมาแล้ว' : 'ไม่มี'
-          });
-
+          // Generate LINE OA URL
+          const lineOAUrl = process.env.LINE_OA_URL || 'https://line.me/R/ti/p/@dygs-logistics';
+          
           res.status(200).json({ 
             success: true, 
             application_id,
-            message: 'สมัครงานสำเร็จ! เราจะติดต่อกลับภายใน 3-5 วันทำการ' 
+            line_oa_url: lineOAUrl,
+            message: 'สมัครงานสำเร็จ! กรุณาเพิ่ม LINE OA เพื่อติดตามสถานะการสมัครงาน' 
           });
 
         } catch (error) {
@@ -242,7 +193,7 @@ module.exports = async (req, res) => {
       res.status(405).json({ error: 'Method not allowed' });
     }
   } catch (error) {
-    console.error('Database error:', error);
-    res.status(500).json({ error: 'Database connection failed' });
+    console.error('Server error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 }; 

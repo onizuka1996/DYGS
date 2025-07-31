@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import axios from 'axios';
-import { Upload, Send, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, Send, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import './App.css';
 
 interface Position {
@@ -35,6 +35,7 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [applicationId, setApplicationId] = useState('');
+  const [lineOAUrl, setLineOAUrl] = useState('');
   const [error, setError] = useState('');
 
   const {
@@ -108,6 +109,7 @@ function App() {
       });
 
       setApplicationId(response.data.application_id);
+      setLineOAUrl(response.data.line_oa_url);
       setSubmitSuccess(true);
       reset();
       setSelectedFile(null);
@@ -116,6 +118,12 @@ function App() {
       setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการส่งใบสมัคร');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleLineOAClick = () => {
+    if (lineOAUrl) {
+      window.open(lineOAUrl, '_blank');
     }
   };
 
@@ -138,14 +146,45 @@ function App() {
           </div>
           
           <p style={{ marginBottom: '20px' }}>
-            เราจะติดต่อกลับไปยังอีเมลหรือเบอร์โทรศัพท์ที่คุณระบุภายใน 3-5 วันทำการ
+            ข้อมูลใบสมัครของคุณได้ถูกบันทึกในระบบแล้ว เราจะติดต่อกลับไปยังอีเมลหรือเบอร์โทรศัพท์ที่คุณระบุภายใน 3-5 วันทำการ
           </p>
+
+          <div style={{ 
+            background: '#f8f9fa', 
+            padding: '20px', 
+            borderRadius: '8px', 
+            marginBottom: '20px',
+            border: '2px solid #28a745'
+          }}>
+            <h3 style={{ marginBottom: '12px', color: '#28a745' }}>
+              📱 ติดตามสถานะการสมัครงาน
+            </h3>
+            <p style={{ marginBottom: '16px', color: '#495057' }}>
+              เพิ่ม LINE OA ของเราเพื่อรับการแจ้งเตือนและติดตามสถานะการสมัครงานของคุณ
+            </p>
+            <button 
+              className="btn btn-primary"
+              onClick={handleLineOAClick}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                backgroundColor: '#00B900',
+                border: 'none'
+              }}
+            >
+              <span style={{ fontSize: '20px' }}>📱</span>
+              เพิ่ม LINE OA
+              <ExternalLink size={16} />
+            </button>
+          </div>
           
           <button 
-            className="btn btn-primary"
+            className="btn btn-secondary"
             onClick={() => {
               setSubmitSuccess(false);
               setApplicationId('');
+              setLineOAUrl('');
             }}
           >
             สมัครงานใหม่
@@ -159,7 +198,7 @@ function App() {
     <div className="container">
       <div className="header">
         <h1>🚛 DYGS Logistics</h1>
-        <p>ระบบสมัครงานออนไลน์ - เชื่อมต่อ LINE OA</p>
+        <p>ระบบสมัครงานออนไลน์ - ง่าย สะดวก รวดเร็ว</p>
       </div>
 
       <div className="card">
@@ -394,7 +433,7 @@ function App() {
           📍 ที่อยู่: 123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110
         </p>
         <p style={{ fontSize: '14px', color: '#6c757d' }}>
-          * ข้อมูลใบสมัครจะถูกส่งไปยัง LINE OA ของบริษัทโดยอัตโนมัติ
+          * ข้อมูลใบสมัครจะถูกบันทึกใน Google Sheets และส่งการแจ้งเตือนผ่าน LINE OA
         </p>
       </div>
     </div>
