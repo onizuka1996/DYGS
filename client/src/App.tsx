@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import axios from 'axios';
-import { Upload, Send, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { Upload, Send, CheckCircle, AlertCircle, ExternalLink, Download } from 'lucide-react';
 import './App.css';
 
 interface Position {
@@ -127,6 +127,10 @@ function App() {
     }
   };
 
+  const handleDownloadExcel = () => {
+    window.open(`${API_BASE_URL}/download`, '_blank');
+  };
+
   if (submitSuccess) {
     return (
       <div className="container">
@@ -146,7 +150,7 @@ function App() {
           </div>
           
           <p style={{ marginBottom: '20px' }}>
-            ข้อมูลใบสมัครของคุณได้ถูกบันทึกในระบบแล้ว เราจะติดต่อกลับไปยังอีเมลหรือเบอร์โทรศัพท์ที่คุณระบุภายใน 3-5 วันทำการ
+            ข้อมูลใบสมัครของคุณได้ถูกบันทึกในไฟล์ Excel แล้ว เราจะติดต่อกลับไปยังอีเมลหรือเบอร์โทรศัพท์ที่คุณระบุภายใน 3-5 วันทำการ
           </p>
 
           <div style={{ 
@@ -432,9 +436,38 @@ function App() {
         <p style={{ marginBottom: '8px' }}>
           📍 ที่อยู่: 123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110
         </p>
-        <p style={{ fontSize: '14px', color: '#6c757d' }}>
-          * ข้อมูลใบสมัครจะถูกบันทึกใน Google Sheets และส่งการแจ้งเตือนผ่าน LINE OA
+        <p style={{ fontSize: '14px', color: '#6c757d', marginBottom: '16px' }}>
+          * ข้อมูลใบสมัครจะถูกบันทึกในไฟล์ Excel และส่งการแจ้งเตือนผ่าน LINE OA
         </p>
+        
+        <div style={{ 
+          background: '#e3f2fd', 
+          padding: '16px', 
+          borderRadius: '8px',
+          border: '1px solid #2196f3'
+        }}>
+          <h4 style={{ marginBottom: '8px', color: '#1976d2' }}>
+            📊 สำหรับ HR/Admin
+          </h4>
+          <p style={{ marginBottom: '12px', color: '#424242', fontSize: '14px' }}>
+            ดาวน์โหลดไฟล์ Excel ที่มีข้อมูลใบสมัครงานทั้งหมด
+          </p>
+          <button 
+            className="btn btn-secondary"
+            onClick={handleDownloadExcel}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              backgroundColor: '#2196f3',
+              color: 'white',
+              border: 'none'
+            }}
+          >
+            <Download size={16} />
+            ดาวน์โหลดไฟล์ Excel
+          </button>
+        </div>
       </div>
     </div>
   );

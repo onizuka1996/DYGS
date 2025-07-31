@@ -1,6 +1,8 @@
-const { google } = require('googleapis');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
+const XLSX = require('xlsx');
+const fs = require('fs');
+const path = require('path');
 
 // Configure multer for memory storage
 const upload = multer({
@@ -21,59 +23,12 @@ const upload = multer({
   }
 });
 
-// Google Sheets API setup
-const auth = new google.auth.GoogleAuth({
-  credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '{}'),
-  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-});
+// Excel file path
+const EXCEL_FILE_PATH = path.join(process.cwd(), 'applications.xlsx');
 
-const sheets = google.sheets({ version: 'v4', auth });
-
-// Save application to Google Sheets
-async function saveToGoogleSheets(applicationData) {
+// Initialize Excel file with headers
+function initializeExcelFile() {
   try {
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
-    const range = 'Applications!A:Z'; // Assuming sheet name is "Applications"
-    
-    const values = [
-      [
-        applicationData.application_id,
-        applicationData.first_name,
-        applicationData.last_name,
-        applicationData.email,
-        applicationData.phone,
-        applicationData.position,
-        applicationData.experience_years,
-        applicationData.education,
-        applicationData.skills,
-        applicationData.cover_letter || '',
-        applicationData.resume_filename || '',
-        new Date().toISOString(),
-        'pending'
-      ]
-    ];
-
-    await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range,
-      valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
-      resource: { values }
-    });
-
-    console.log('Application saved to Google Sheets successfully');
-  } catch (error) {
-    console.error('Google Sheets error:', error);
-    throw error;
-  }
-}
-
-// Initialize Google Sheet
-async function initializeGoogleSheet() {
-  try {
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
-    
-    // Create headers if sheet doesn't exist
     const headers = [
       'Application ID',
       'First Name',
@@ -90,16 +45,113 @@ async function initializeGoogleSheet() {
       'Status'
     ];
 
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: 'Applications!A1:M1',
-      valueInputOption: 'RAW',
-      resource: { values: [headers] }
-    });
-
-    console.log('Google Sheet initialized successfully');
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet([headers]);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Applications');
+    
+    XLSX.writeFile(workbook, EXCEL_FILE_PATH);
+    console.log('Excel file initialized successfully');
   } catch (error) {
-    console.error('Error initializing Google Sheet:', error);
+    console.error('Error initializing Excel file:', error);
+  }
+}
+
+// Save application to Excel file
+async function saveToExcel(applicationData) {
+  try {
+    let workbook;
+    let worksheet;
+    
+    // Check if file exists
+    if (fs.existsSync(EXCEL_FILE_PATH)) {
+      workbook = XLSX.readFile(EXCEL_FILE_PATH);
+      worksheet = workbook.Sheets['Applications'];
+    } else {
+      // Initialize new file
+      initializeExcelFile();
+      workbook = XLSX.readFile(EXCEL_FILE_PATH);
+      worksheet = workbook.Sheets['Applications'];
+    }
+
+    // Convert worksheet to JSON to get existing data
+    const existingData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    // Add new application data
+    const newRow = [
+      applicationData.application_id,
+      applicationData.first_name,
+      applicationData.last_name,
+      applicationData.email,
+      applicationData.phone,
+      applicationData.position,
+      applicationData.experience_years,
+      applicationData.education,
+      applicationData.skills,
+      applicationData.cover_letter || '',
+      applicationData.resume_filename || '',
+      new Date().toISOString(),
+      'pending'
+    ];
+    
+    existingData.push(newRow);
+    
+    // Create new worksheet with updated data
+    const newWorksheet = XLSX.utils.aoa_to_sheet(existingData);
+    workbook.Sheets['Applications'] = newWorksheet;
+    
+    // Write to file
+    XLSX.writeFile(workbook, EXCEL_FILE_PATH);
+    
+    console.log('Application saved to Excel file successfully');
+  } catch (error) {
+    console.error('Excel file error:', error);
+    throw error;
+  }
+}
+
+// Get all applications from Excel file
+async function getAllApplications() {
+  try {
+    if (!fs.existsSync(EXCEL_FILE_PATH)) {
+      return [];
+    }
+    
+    const workbook = XLSX.readFile(EXCEL_FILE_PATH);
+    const worksheet = workbook.Sheets['Applications'];
+    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    // Skip header row and convert to objects
+    const applications = data.slice(1).map(row => ({
+      application_id: row[0],
+      first_name: row[1],
+      last_name: row[2],
+      email: row[3],
+      phone: row[4],
+      position: row[5],
+      experience_years: row[6],
+      education: row[7],
+      skills: row[8],
+      cover_letter: row[9],
+      resume_filename: row[10],
+      submission_date: row[11],
+      status: row[12]
+    }));
+    
+    return applications;
+  } catch (error) {
+    console.error('Error reading Excel file:', error);
+    return [];
+  }
+}
+
+// Get application by ID
+async function getApplicationById(id) {
+  try {
+    const applications = await getAllApplications();
+    return applications.find(app => app.application_id === id);
+  } catch (error) {
+    console.error('Error getting application by ID:', error);
+    return null;
   }
 }
 
@@ -116,17 +168,21 @@ module.exports = async (req, res) => {
 
   try {
     if (req.method === 'GET') {
-      // Get application by ID
+      // Get application by ID or all applications
       const { id } = req.query;
-      if (!id) {
-        return res.status(400).json({ error: 'Application ID is required' });
+      
+      if (id) {
+        // Get specific application
+        const application = await getApplicationById(id);
+        if (!application) {
+          return res.status(404).json({ error: 'Application not found' });
+        }
+        res.status(200).json(application);
+      } else {
+        // Get all applications
+        const applications = await getAllApplications();
+        res.status(200).json(applications);
       }
-
-      // For now, return a simple response since we're not storing in database
-      res.status(200).json({ 
-        application_id: id,
-        message: 'Application submitted successfully. Please check your email for confirmation.'
-      });
     } else if (req.method === 'POST') {
       // Handle file upload and application submission
       upload.single('resume')(req, res, async (err) => {
@@ -171,8 +227,8 @@ module.exports = async (req, res) => {
             resume_filename
           };
 
-          // Save to Google Sheets
-          await saveToGoogleSheets(application);
+          // Save to Excel file
+          await saveToExcel(application);
 
           // Generate LINE OA URL
           const lineOAUrl = process.env.LINE_OA_URL || 'https://line.me/R/ti/p/@dygs-logistics';
