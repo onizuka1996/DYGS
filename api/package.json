@@ -1,0 +1,12 @@
+{
+  "name": "dygs-api",
+  "version": "1.0.0",
+  "description": "API functions for DYGS job application",
+  "main": "index.js",
+  "dependencies": {
+    "mongodb": "^6.3.0",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^9.0.1",
+    "@line/bot-sdk": "^7.5.2"
+  }
+} 
