@@ -26,7 +26,7 @@ interface ApplicationForm {
 
 // API base URL
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://your-vercel-app.vercel.app/api' 
+  ? 'https://dygs-job-application.vercel.app/api' 
   : '/api';
 
 function App() {
